@@ -69,8 +69,6 @@ mesures <- rbind(ma_qp_fm_ttres_pesteso_2007,
 mesures$Ecart_norme <- mesures$MA_MOY - mesures$NORME_DCE
 
 
-
-
 moyennes <- rbind(moy_tot_quantif_2007,
                   moy_tot_quantif_2008,
                   moy_tot_quantif_2009,
@@ -84,6 +82,8 @@ departements <- left_join(departements,regions,by="REGION")
 
 moyennes <- left_join(moyennes, departements, by=c("NUM_DEP"="DEP"))
 
+#noms des région stocké dans NCC.y
+moyennes <- moyennes %>% dplyr::rename(NOM_REG = NCC.y)
 
 
 
