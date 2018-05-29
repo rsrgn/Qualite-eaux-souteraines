@@ -4,19 +4,22 @@ rm(list = ls())
 #----Loading libraries----
 
 library(tidyverse)
+library(reshape)
 
 #Cartographie
 library(sf)
 library(SpatialPosition)
 library(cartography)
 
+
 library(gridExtra)
 
 #----Setting Working Directory----
 
 #PORTABLE RAPH
-setwd("C:/Users/serou/Documents/cours/MEDAS/DATAVIZ/projet")
-
+#setwd("C:/Users/serou/Documents/cours/MEDAS/DATAVIZ/projet")
+#PC BUREAU
+setwd("X:/Raphael/ADHERENT/07 - FICHIERS/ANALYSES/PROJET2/projet")
 
 #----Loading data----
 
@@ -49,6 +52,8 @@ departements <- read.csv2(file="./data/depts2016.csv")
 pathAE <- "./data/ADMIN-EXPRESS-COG_1-0__SHP__FRA_2017-06-19/ADMIN-EXPRESS-COG/1_DONNEES_LIVRAISON_2017-06-19/ADE-COG_1-0_SHP_LAMB93_FR"
 
 dept2 <- st_read(dsn = pathAE, layer="DEPARTEMENT", stringsAsFactors=FALSE)
+
+
 
 
 #----Préparation des données----
@@ -118,151 +123,266 @@ p1 <- p1 + labs(caption = "Source: Ministère de la Transition écologique et soli
 p1
 dev.off()
 
-#----praparation des donnes carte----
+#----Contour France----
 
-str(mesures[mesures$Ecart_norme > 0 , "MA_MOY"])
+france <- st_union(dept2)
+france <- as(france,"Spatial")
+
+#Paramètres graphiques
+
+larg <- 7500
+haut <- 4000
+resolution <- 900
+
+
+#----praparation des données carte 2012---
 
 stations$CD_STATION <- as.character(stations$CD_STATION) 
 ma_qp_fm_ttres_pesteso_2012$CD_STATION <- as.character(ma_qp_fm_ttres_pesteso_2012$CD_STATION)
 
 #ajout des données des stations dans les mesures
 ma_qp_fm_ttres_pesteso_2012 <- left_join(x = ma_qp_fm_ttres_pesteso_2012,y =  stations, by= "CD_STATION")
-grouped_mesures <- group_by(ma_qp_fm_ttres_pesteso_2012, NUM_DEP, LB_PARAMETRE)
-mesures_par_dept <- na.omit(summarise(grouped_mesures, moy_dept=mean(MA_MOY)))
+ma_qp_fm_ttres_pesteso_2012 <- left_join(x=ma_qp_fm_ttres_pesteso_2012,y=pesticides,by="LB_PARAMETRE")
+
+grouped_mesures_2012 <- group_by(ma_qp_fm_ttres_pesteso_2012, NUM_DEP, CODE_FAMILLE)
+mesures_par_dept_2012 <- na.omit(summarise(grouped_mesures_2012, moy_dept=mean(MA_MOY)))
+
+#supressions des caractères speciaux dans les titres de colonnes
+mesures_par_dept_2012$CODE_FAMILLE <- gsub("é","e",mesures_par_dept_2012$CODE_FAMILLE)
+mesures_par_dept_2012$CODE_FAMILLE <- gsub("è","e",mesures_par_dept_2012$CODE_FAMILLE)
+mesures_par_dept_2012$CODE_FAMILLE <- gsub("ê","e",mesures_par_dept_2012$CODE_FAMILLE)
+mesures_par_dept_2012$CODE_FAMILLE <- gsub("à","a",mesures_par_dept_2012$CODE_FAMILLE)
+mesures_par_dept_2012$CODE_FAMILLE <- gsub("ï","i",mesures_par_dept_2012$CODE_FAMILLE)
+mesures_par_dept_2012$CODE_FAMILLE <- gsub(" ","_",mesures_par_dept_2012$CODE_FAMILLE)
+mesures_par_dept_2012$CODE_FAMILLE <- gsub("\\(","",mesures_par_dept_2012$CODE_FAMILLE)
+mesures_par_dept_2012$CODE_FAMILLE <- gsub(")","",mesures_par_dept_2012$CODE_FAMILLE)
+
+mesures_par_dept_2012_2 <- cast(data = mesures_par_dept_2012, NUM_DEP ~ CODE_FAMILLE )
+
+#ajout des mesures par pesticide dans la carte des departements.
+dept_pest_2012 <- left_join(x=dept2 , y=mesures_par_dept_2012_2, by=c("INSEE_DEP"="NUM_DEP") )
+
+#vecteur de titres des cartes
+
+familles_2012 <- data.frame(noms=unique(ma_qp_fm_ttres_pesteso_2012$CODE_FAMILLE))
+familles_2012$noms2 <- familles_2012$noms
+
+familles_2012$noms2 <- gsub("é","e",familles_2012$noms2)
+familles_2012$noms2 <- gsub("è","e",familles_2012$noms2)
+familles_2012$noms2 <- gsub("ê","e",familles_2012$noms2)
+familles_2012$noms2 <- gsub("à","a",familles_2012$noms2)
+familles_2012$noms2 <- gsub("ï","i",familles_2012$noms2)
+familles_2012$noms2 <- gsub(" ","_",familles_2012$noms2)
+familles_2012$noms2 <- gsub("\\(","",familles_2012$noms2)
+familles_2012$noms2 <- gsub(")","",familles_2012$noms2)
+
+familles_2012 <- familles_2012[order(familles_2012$noms2),]
+familles_2012 
+
+#----map 2012 - lissées----
 
 
+png(paste("./map/carte_lissee_Moy_FamillesPesticide_2012.png",sep=""),  width= larg , height= haut ,res=resolution)
 
-mtq <- st_read(system.file("shape/martinique.shp", package="cartography"))
-smoothLayer(x = mtq, var = 'P13_POP',
-            span = 4000, beta = 2, breaks = c(0,5000,seq(10000,110000,10000)),
-            mask = mtq, border = NA,
-            col = carto.pal(pal1 = 'wine.pal', n1 = 12),
-            legend.title.txt = "Population\nPotential",
-            legend.pos = "topright", legend.values.rnd = -2)
-propSymbolsLayer(x = mtq, var = "P13_POP", legend.pos = c(690000, 1599950),
-                 legend.title.txt = "Population 2013",
-                 col = NA, border = "#ffffff50")
-layoutLayer(title = "Actual and Potential Popultation in Martinique",
-            author = "INSEE, 2016", sources = "")
+opar <- par(mfrow = c(4,4), mar = c(0,0,1.2,0))
 
-
-
-# Plot dentsity of population
-mtq$dens <- mtq$P13_POP / (st_area(mtq) / (1000 * 1000))
-mygrid$densitykm <- mygrid$P13_POP / (mygrid$gridarea / (1000 * 1000))
-
-
-bks <- getBreaks(v = dept_AMPA$moy_dept, method = "q6")
-cols <- carto.pal(pal1 = "taupe.pal", n1 = length(bks)-1)
-opar <- par(mfrow = c(1,2), mar = c(0,0,0,0))
-
-choroLayer(x = dept_AMPA, var = "moy_dept", breaks = bks,
-           border = "burlywood3", col = cols,
-           legend.pos = "topright", legend.values.rnd = 4,
-           legend.title.txt = "Population density")
-
-mygrid <- getGridLayer(x = dept_AMPA, cellsize = 50000 * 50000,
-                       type = "regular", var = "moy_dept")
-
-choroLayer(x = mygrid, var = "moy_dept", breaks = bks,
-           border = "burlywood3", col = cols,
-           #legend.pos = "n", 
-           legend.values.rnd = 4,
-           legend.title.txt = "Population density")
-
-
-
-smoothLayer(x = dept_AMPA, var = 'moy_dept',
-            span = 75000, beta = 2, #breaks = bks,
-            mask = france, border = NA,
-            col = c(rev(carto.pal("green.pal", 3)), carto.pal("orange.pal", 5)),
-            legend.pos = "topright", legend.values.rnd = 4)
-
-points(x=ma_qp_fm_ttres_pesteso_2012$X_FICT_L93,
-       y=ma_qp_fm_ttres_pesteso_2012$Y_FICT_L93,add=T)
-
-
-mesures_par_dept_endrine <- mesures_par_dept %>% filter(LB_PARAMETRE == "Endrine")
-mesures_par_dept_AMPA <- mesures_par_dept %>% filter(LB_PARAMETRE == "AMPA")
-
-dept3 <- left_join(x=dept2 , y=mesures_par_dept_endrine, by=c("INSEE_DEP"="NUM_DEP") )
-dept_AMPA <- left_join(x=dept2 , y=mesures_par_dept_AMPA, by=c("INSEE_DEP"="NUM_DEP") )
-
+i<-1
+for(i in 1:16){
+    smoothLayer(x = dept_pest_2012, var = familles_2012$noms2[i],
+              span = 75000, beta = 2, #breaks = bks,
+              mask = france, border = NA,
+              col = c(rev(carto.pal("green.pal", 4)), carto.pal("orange.pal", 4)),
+              legend.pos = "topleft", legend.values.rnd = 3,
+              legend.title.txt = "Qté. en µg/l"
+              )
+  layoutLayer(title = familles_2012$noms[i], 
+              author = "", sources = "", scale=NULL , col="grey40")
+  
+}
 
 dev.off()
 
-choroLayer(dept_AMPA , var = "moy_dept")
-layoutLayer(title = "AMPA / dept",
-            frame = TRUE, tabtitle = TRUE)
 
-?choroLayer
-
-# list of breaks
-v <- c(0.05, 0.1, 0.2,0.3,0.35, 0.4, 0.45,0.5,1)
-# set a color palette
-cols <- c(rev(carto.pal("green.pal", 4)), carto.pal("orange.pal", 4))
-cols2 <- c(rev(carto.pal("green.pal", 7)), carto.pal("orange.pal", 7))
+#----map 2012 - par départements ----
 
 
+png(paste("./map/carte_dept_Moy_FamillesPesticide_2012.png",sep=""),  width= larg , height= haut ,res=resolution)
 
-mygrid <- getGridLayer(x = dept_AMPA, var = "moy_dept", cellsize = 100000 * 100000, type = "regular")
-bks <- getBreaks(v=mygrid$moy_dept, method = "q6")
-length(bks)
-cols <- carto.pal(pal1 ="red.pal", n1=length(bks)-1)
-choroLayer(mygrid, 
-           var = "moy_dept",
-           col = cols, breaks = bks,
-           legend.values.rnd = 3)
+opar <- par(mfrow = c(4,4), mar = c(0,0,1.2,0))
 
+i<-1
+for(i in 1:16){
+  bks <- getBreaks(v=mesures_par_dept_2012_2[,familles_2012$noms2[i]], method = "quantile", nclass = 8)
+  choroLayer(x = dept_pest_2012, var = familles_2012$noms2[i],
+              breaks = bks,
+              col = c(rev(carto.pal("green.pal", 4)), carto.pal("orange.pal", 4)),
+              legend.pos = "bottomleft", legend.values.rnd = 4,
+              legend.title.txt = "Qté. en µg/l",
+              border = NA
+  )
+  
+  plot(france, border="grey15", add = TRUE , lwd = 0.5)
 
+  layoutLayer(title = familles_2012$noms[i], 
+              author = "", sources = "", scale=NULL , col="grey40")
+  
+}
 
-summary(mygrid$moy_dept)
-plot(dept3$geometry, border = NA, col = NA, bg = "#A6CAE0")
-
-plot(mygrid$geometry)
-
-dept4 <-  as(dept3,"Spatial")
-
-france <- st_union(dept_AMPA)
-france <- as(france,"Spatial")
-plot(france)
-
-# compute & display the potential map
-
-par(mfrow=c(1,2))
+dev.off()
 
 
-choroLayer(mygrid, 
-           var = "moy_dept",
-           col = cols2,
-           legend.values.rnd = 3)
 
 
-cols <- c(rev(carto.pal("green.pal", 4)), carto.pal("orange.pal", 4))
+#----praparation des données cartes 2007---
 
-smoothLayer(x = dept_AMPA, 
-            var = "moy_dept",
-            #breaks=bks,
-            span = 0.65e+05, beta = 2, mask = france, 
-            resolution = 5000, col = cols, 
-            legend.title.txt = "AMPA", 
-            border = "grey80", lwd = 0.5,
-            legend.values.rnd = 3)
+#ajout des données des stations dans les mesures
+ma_qp_fm_ttres_pesteso_2007 <- left_join(x = ma_qp_fm_ttres_pesteso_2007,y =  stations, by = "CD_STATION")
+ma_qp_fm_ttres_pesteso_2007 <- left_join(x = ma_qp_fm_ttres_pesteso_2007,y = pesticides,by = "LB_PARAMETRE")
 
-bks <- getBreaks(v=dept_AMPA$moy_dept, method = "q6")
-length(bks)
-cols <- c(rev(carto.pal("green.pal", length(bks)/2 )), carto.pal("orange.pal", length(bks)/2))
-choroLayer(dept_AMPA , 
-           var = "moy_dept",
-           col = cols, breaks = bks,
-           legend.title.txt = "AMPA",
-           legend.values.rnd = 3)
+grouped_mesures_2007 <- group_by(ma_qp_fm_ttres_pesteso_2007, NUM_DEP, CODE_FAMILLE)
+mesures_par_dept_2007 <- na.omit(summarise(grouped_mesures_2007, moy_dept=mean(MA_MOY)))
 
-dept_AMPA$area <- st_area(dept_AMPA)
-dept_AMPA$moy_dept_by_m2 <- dept_AMPA$moy_dept / dept_AMPA$area
-choroLayer(dept_AMPA , var = "moy_dept_by_m2",col = cols,legend.title.txt = "AMPA",legend.values.rnd = 15)
+#supressions des caractères speciaux dans les titres de colonnes
+mesures_par_dept_2007$CODE_FAMILLE <- gsub("é","e",mesures_par_dept_2007$CODE_FAMILLE)
+mesures_par_dept_2007$CODE_FAMILLE <- gsub("è","e",mesures_par_dept_2007$CODE_FAMILLE)
+mesures_par_dept_2007$CODE_FAMILLE <- gsub("ê","e",mesures_par_dept_2007$CODE_FAMILLE)
+mesures_par_dept_2007$CODE_FAMILLE <- gsub("à","a",mesures_par_dept_2007$CODE_FAMILLE)
+mesures_par_dept_2007$CODE_FAMILLE <- gsub("ï","i",mesures_par_dept_2007$CODE_FAMILLE)
+mesures_par_dept_2007$CODE_FAMILLE <- gsub(" ","_",mesures_par_dept_2007$CODE_FAMILLE)
+mesures_par_dept_2007$CODE_FAMILLE <- gsub("\\(","",mesures_par_dept_2007$CODE_FAMILLE)
+mesures_par_dept_2007$CODE_FAMILLE <- gsub(")","",mesures_par_dept_2007$CODE_FAMILLE)
 
-#----carte-----
+mesures_par_dept_2007_2 <- cast(data = mesures_par_dept_2007, NUM_DEP ~ CODE_FAMILLE )
+
+#ajout des mesures par pesticide dans la carte des departements.
+dept_pest_2007 <- left_join(x=dept2 , y=mesures_par_dept_2007_2, by=c("INSEE_DEP"="NUM_DEP") )
+
+#vecteur de titres des cartes
+
+familles_2007 <- data.frame(noms=unique(ma_qp_fm_ttres_pesteso_2007$CODE_FAMILLE))
+familles_2007$noms2 <- familles_2007$noms
+
+familles_2007$noms2 <- gsub("é","e",familles_2007$noms2)
+familles_2007$noms2 <- gsub("è","e",familles_2007$noms2)
+familles_2007$noms2 <- gsub("ê","e",familles_2007$noms2)
+familles_2007$noms2 <- gsub("à","a",familles_2007$noms2)
+familles_2007$noms2 <- gsub("ï","i",familles_2007$noms2)
+familles_2007$noms2 <- gsub(" ","_",familles_2007$noms2)
+familles_2007$noms2 <- gsub("\\(","",familles_2007$noms2)
+familles_2007$noms2 <- gsub(")","",familles_2007$noms2)
+
+familles_2007 <- familles_2007[order(familles_2007$noms2),]
+familles_2007
+
+#----map 2017 lissée ----
+
+
+png(paste("./map/carte_lissee_Moy_FamillesPesticide_2007.png",sep=""),  width= larg , height= haut ,res=resolution)
+
+opar <- par(mfrow = c(4,4), mar = c(0,0,1.2,0))
+
+i<-1
+for(i in 1:16){
+  smoothLayer(x = dept_pest_2007, var = familles_2007$noms2[i],
+              span = 75000, beta = 2, #breaks = bks,
+              mask = france, border = NA,
+              col = c(rev(carto.pal("green.pal", 4)), carto.pal("orange.pal", 4)),
+              legend.pos = "topleft", legend.values.rnd = 3,
+              legend.title.txt = "Qté. en µg/l"
+  )
+  plot(france, border="grey15", add = TRUE , lwd = 0.5)
+  layoutLayer(title = familles_2007$noms[i], 
+              author = "", sources = "", scale=NULL , col="grey40")
+  
+}
+
+dev.off()
+
+
+#----map 2007 - par départements ----
+
+png(paste("./map/carte_dept_Moy_FamillesPesticide_2007.png",sep=""),  width= larg , height= haut ,res= resolution)
+
+opar <- par(mfrow = c(4,4), mar = c(0,0,1.2,0))
+
+i<-1
+for(i in 1:16){
+  bks <- getBreaks(v=mesures_par_dept_2007_2[,familles_2007$noms2[i]], method = "quantile", nclass = 8)
+  choroLayer(x = dept_pest_2007, var = familles_2007$noms2[i],
+             breaks = bks,
+             col = c(rev(carto.pal("green.pal", 4)), carto.pal("orange.pal", 4)),
+             legend.pos = "bottomleft", legend.values.rnd = 3,
+             legend.title.txt = "Qté. en µg/l" , border = NA
+  )
+  plot(france, border="grey15", add = TRUE , lwd = 0.5)
+  layoutLayer(title = familles_2007$noms[i], 
+              author = "", sources = "", scale=NULL , col="grey40")
+  
+}
+
+dev.off()
+
+
+
+#----preparation des données normes----
+
+mesures$Ecart_norme <- mesures$MA_MOY - mesures$NORME_DCE
+
+#ajout des données des stations dans les mesures
+mesures <- left_join(x = mesures,y =  stations, by= "CD_STATION")
+mesures <- left_join(x=mesures,y=pesticides,by="LB_PARAMETRE")
+
+grouped_mesures <- group_by(mesures, NUM_DEP, année)
+grouped_mesures$respect_norme <- ifelse(grouped_mesures$Ecart_norme > 0,"norme depassée","norme respectée")
+
+
+mesures_par_dept <- na.omit(summarise(grouped_mesures, resp_norme = n()  ))
+sum(mesures_par_dept$resp_norme)
+
+
+#supressions des caractères speciaux dans les titres de colonnes
+mesures_par_dept$CODE_FAMILLE <- gsub("é","e",mesures_par_dept$CODE_FAMILLE)
+mesures_par_dept$CODE_FAMILLE <- gsub("è","e",mesures_par_dept$CODE_FAMILLE)
+mesures_par_dept$CODE_FAMILLE <- gsub("ê","e",mesures_par_dept$CODE_FAMILLE)
+mesures_par_dept$CODE_FAMILLE <- gsub("à","a",mesures_par_dept$CODE_FAMILLE)
+mesures_par_dept$CODE_FAMILLE <- gsub("ï","i",mesures_par_dept$CODE_FAMILLE)
+mesures_par_dept$CODE_FAMILLE <- gsub(" ","_",mesures_par_dept$CODE_FAMILLE)
+mesures_par_dept$CODE_FAMILLE <- gsub("\\(","",mesures_par_dept$CODE_FAMILLE)
+mesures_par_dept$CODE_FAMILLE <- gsub(")","",mesures_par_dept$CODE_FAMILLE)
+
+mesures_par_dept_2 <- cast(data = mesures_par_dept, NUM_DEP ~ CODE_FAMILLE )
+
+#ajout des mesures par pesticide dans la carte des departements.
+dept_pest <- left_join(x=dept2 , y=mesures_par_dept_2, by=c("INSEE_DEP"="NUM_DEP") )
+
+#vecteur de titres des cartes
+
+familles <- data.frame(noms=unique(mesures$CODE_FAMILLE))
+familles$noms2 <- familles$noms
+
+familles$noms2 <- gsub("é","e",familles$noms2)
+familles$noms2 <- gsub("è","e",familles$noms2)
+familles$noms2 <- gsub("ê","e",familles$noms2)
+familles$noms2 <- gsub("à","a",familles$noms2)
+familles$noms2 <- gsub("ï","i",familles$noms2)
+familles$noms2 <- gsub(" ","_",familles$noms2)
+familles$noms2 <- gsub("\\(","",familles$noms2)
+familles$noms2 <- gsub(")","",familles$noms2)
+
+familles <- familles[order(familles$noms2),]
+familles 
+
+
+
+
+
+
+#----carte avec les normes-----
+
+
+
+
+
 
 
 #dimmentionnement 
@@ -295,18 +415,4 @@ choroLayer(dept3 , var = "Freq")
 layoutLayer(title = "Nombre de mesures supérieurs à la norme DCE \npar département pour l'année 2017",
             frame = TRUE, tabtitle = TRUE)
 dev.off() 
-
-
-
-#----sandbox-aquiferes----
-plot(aquiferes)
-
-aquiferes_data <- aquiferes@data
-
-head(aquiferes@data)
-
-str(aquiferes@data[aquiferes@data$Niveau==2,])
-
-plot(aquiferes[aquiferes@data$Niveau==2,])
-
 
