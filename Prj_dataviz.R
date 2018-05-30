@@ -12,8 +12,6 @@ library(SpatialPosition)
 library(cartography)
 
 
-library(gridExtra)
-
 #----Setting Working Directory----
 
 #PORTABLE RAPH
@@ -109,6 +107,15 @@ grouped_moyennes <- group_by(moyennes2,ANNEE, NOM_REG)
 per_region <- summarise(grouped_moyennes, n_region=n())
 par_region <- na.omit(summarise(grouped_moyennes, moy_reg=mean(MOYPTOT)))
 
+#recherches d'informations sur les mesures abérantes du département 45
+moyennes %>% filter(MOYPTOT > 50) 
+moyennes %>% filter(CD_STATION == "03288X0042/P") 
+mesures %>% filter(CD_STATION == "03288X0042/P") 
+mesures %>% filter(CODE_FAMILLE == "Autres éléments minéraux") 
+
+#Vérif région Corse
+moyennes %>% filter(REGION == 94) 
+
 #----graphique evolution mesure pesticides par regions----
 dev.off() 
 png(paste("./graph/graph1.png",sep=""),  width= 2000 , height= 1200 ,res=250)
@@ -135,7 +142,7 @@ haut <- 4000
 resolution <- 900
 
 
-#----praparation des données carte 2012---
+#----praparation des données carte 2012----
 
 stations$CD_STATION <- as.character(stations$CD_STATION) 
 ma_qp_fm_ttres_pesteso_2012$CD_STATION <- as.character(ma_qp_fm_ttres_pesteso_2012$CD_STATION)
@@ -233,7 +240,8 @@ dev.off()
 
 
 
-#----praparation des données cartes 2007---
+#----praparation des données cartes 2007----
+
 
 #ajout des données des stations dans les mesures
 ma_qp_fm_ttres_pesteso_2007 <- left_join(x = ma_qp_fm_ttres_pesteso_2007,y =  stations, by = "CD_STATION")
@@ -322,8 +330,6 @@ for(i in 1:16){
 
 dev.off()
 
-
-
 #----preparation des données normes----
 
 mesures$Ecart_norme <- mesures$MA_MOY - mesures$NORME_DCE
@@ -335,84 +341,59 @@ mesures <- left_join(x=mesures,y=pesticides,by="LB_PARAMETRE")
 grouped_mesures <- group_by(mesures, NUM_DEP, année)
 grouped_mesures$respect_norme <- ifelse(grouped_mesures$Ecart_norme > 0,"norme depassée","norme respectée")
 
+#calcul du taux de dépassement de la norme par département 
+#il s'agit du nombres de mesure dépassant la norme sur le nombre de mesures total
+mesures_par_dept <- grouped_mesures %>% summarise(N_respect_norme = sum(respect_norme == "norme respectée"),
+                                      N_depass_norme = sum(respect_norme == "norme depassée"), 
+                                      N_mesures = n())
 
-mesures_par_dept <- na.omit(summarise(grouped_mesures, resp_norme = n()  ))
-sum(mesures_par_dept$resp_norme)
+mesures_par_dept$Tx_Dépassement_Norme <- mesures_par_dept$N_depass_norme / mesures_par_dept$N_mesures
+mesures_par_dept
 
 
-#supressions des caractères speciaux dans les titres de colonnes
-mesures_par_dept$CODE_FAMILLE <- gsub("é","e",mesures_par_dept$CODE_FAMILLE)
-mesures_par_dept$CODE_FAMILLE <- gsub("è","e",mesures_par_dept$CODE_FAMILLE)
-mesures_par_dept$CODE_FAMILLE <- gsub("ê","e",mesures_par_dept$CODE_FAMILLE)
-mesures_par_dept$CODE_FAMILLE <- gsub("à","a",mesures_par_dept$CODE_FAMILLE)
-mesures_par_dept$CODE_FAMILLE <- gsub("ï","i",mesures_par_dept$CODE_FAMILLE)
-mesures_par_dept$CODE_FAMILLE <- gsub(" ","_",mesures_par_dept$CODE_FAMILLE)
-mesures_par_dept$CODE_FAMILLE <- gsub("\\(","",mesures_par_dept$CODE_FAMILLE)
-mesures_par_dept$CODE_FAMILLE <- gsub(")","",mesures_par_dept$CODE_FAMILLE)
+mesures_par_dept_2 <- cast(data = mesures_par_dept, formula = NUM_DEP ~ année , value = "Tx_Dépassement_Norme") 
+mesures_par_dept_3 <- cast(data = mesures_par_dept, formula = NUM_DEP ~ année , value = "N_mesures") 
 
-mesures_par_dept_2 <- cast(data = mesures_par_dept, NUM_DEP ~ CODE_FAMILLE )
+mesures_par_dept_2 <- mesures_par_dept_2 %>% dplyr::rename("Tx_Dépassement_Norme_2007" = "2007",
+                                                           "Tx_Dépassement_Norme_2008" = "2008",
+                                                           "Tx_Dépassement_Norme_2009" = "2009",
+                                                           "Tx_Dépassement_Norme_2010" = "2010",
+                                                           "Tx_Dépassement_Norme_2011" = "2011",
+                                                           "Tx_Dépassement_Norme_2012" = "2012")
+
+mesures_par_dept_3 <- mesures_par_dept_3 %>% dplyr::rename("N_mesures_2007" = "2007",
+                                                           "N_mesures_2008" = "2008",
+                                                           "N_mesures_2009" = "2009",
+                                                           "N_mesures_2010" = "2010",
+                                                           "N_mesures_2011" = "2011",
+                                                           "N_mesures_2012" = "2012")
 
 #ajout des mesures par pesticide dans la carte des departements.
 dept_pest <- left_join(x=dept2 , y=mesures_par_dept_2, by=c("INSEE_DEP"="NUM_DEP") )
-
-#vecteur de titres des cartes
-
-familles <- data.frame(noms=unique(mesures$CODE_FAMILLE))
-familles$noms2 <- familles$noms
-
-familles$noms2 <- gsub("é","e",familles$noms2)
-familles$noms2 <- gsub("è","e",familles$noms2)
-familles$noms2 <- gsub("ê","e",familles$noms2)
-familles$noms2 <- gsub("à","a",familles$noms2)
-familles$noms2 <- gsub("ï","i",familles$noms2)
-familles$noms2 <- gsub(" ","_",familles$noms2)
-familles$noms2 <- gsub("\\(","",familles$noms2)
-familles$noms2 <- gsub(")","",familles$noms2)
-
-familles <- familles[order(familles$noms2),]
-familles 
-
-
-
-
-
+dept_pest <- left_join(x=dept_pest , y=mesures_par_dept_3, by=c("INSEE_DEP"="NUM_DEP") )
 
 #----carte avec les normes-----
 
 
+png(paste("./map/carte_dept_Tx_Dep_Norme.png",sep=""),  width= larg , height= haut ,res= resolution)
 
+opar <- par(mfrow = c(2,3), mar = c(0,0,1.2,0))
+bks <- getBreaks(v=mesures_par_dept$Tx_Dépassement_Norme, method = "quantile", nclass = 4)
+année <- c("2007","2008","2009","2010","2011","2012")
 
+i <- 1
+for(i in 1:6){
+  
+  choroLayer(x = dept_pest, var = paste("Tx_Dépassement_Norme_",année[i],sep=""),
+             breaks = bks,
+             col = carto.pal(pal1 = "sand.pal", n1 = 4),
+             legend.pos = "bottomleft", legend.values.rnd = 5,
+             legend.title.txt = "Taux" , border = NA
+  )
+  plot(france, border="grey10", add = TRUE , lwd = 0.3)
+  layoutLayer(title = paste("Taux de dépassement de la norme DCE en ",année[i],sep=""), 
+              author = "", source="" , scale=NULL , col="grey40")
+              #sources = "Source : Ministère de la Transition écologique et solidaire \nMéthode : Nombre de mesures dépassant la norme DCE divisé par le nombre de mesures total \npar département", scale=NULL , col="grey40")
+}
 
-
-
-#dimmentionnement 
-
-dimcarte <- st_bbox(dept3)
-dimcarte
-largeurcarte <- round((dimcarte[1,2] - dimcarte[1,1] ), 0)
-hauteurcarte <- round((dimcarte[2,2] - dimcarte[2,1] ), 0)
-largeurimage <- 1920 #1920  < 3840 < 7680
-hauteurimage <- round((( largeurimage * hauteurcarte) / largeurcarte ),0)
-
-#taille des caractere : labels
-Taille_labels <- 0.35
-TailleNombres <- 0.6
-
-#resolution des cartes
-Resolution <- 750 # *1500
-
-
-
-#nom de la carte et du fichier export?
-Nom_carte <- paste("Nb licenciement par dept Martinique_",Version)
-Nom_carte2 <- "Martinique"
-#fichier image
-
-dev.off() 
-png(paste("./map/test.png",sep="")  ,res=750)
-plot(dept3)
-choroLayer(dept3 , var = "Freq")
-layoutLayer(title = "Nombre de mesures supérieurs à la norme DCE \npar département pour l'année 2017",
-            frame = TRUE, tabtitle = TRUE)
-dev.off() 
-
+dev.off()
