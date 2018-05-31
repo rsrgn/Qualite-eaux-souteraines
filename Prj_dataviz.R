@@ -330,7 +330,93 @@ for(i in 1:16){
 
 dev.off()
 
+
+
+#----map 2007 VS 2012 - par départements ----
+``
+larg <- 3750 # 7500
+haut <- 8000 # 4000
+resolution <- 900
+
+?choroLayer
+
+png(paste("./map/carte_dept_Moy_FamillesPesticide_2007_2012_P1.png",sep=""),  width= larg , height= haut ,res= resolution)
+opar <- par(mfrow = c(8,2), mar = c(0,0,1.2,0))
+
+i<-1
+for(i in 1:8){
+  
+  #echelle commune pour comparer 2007 à 2012
+  c_2007_2012 <- c(mesures_par_dept_2007_2[,familles_2007$noms2[i]],mesures_par_dept_2012_2[,familles_2012$noms2[i]])
+  bks <- getBreaks(v=c_2007_2012, method = "quantile", nclass = 8)
+  
+  #map 2007
+  choroLayer(x = dept_pest_2007, var = familles_2007$noms2[i],
+             breaks = bks,
+             col = c(rev(carto.pal("green.pal", 4)), carto.pal("orange.pal", 4)),
+             legend.pos = "bottomleft", legend.values.rnd = 3,
+             legend.title.txt = "Qté. en µg/l" , border = NA
+  )
+  plot(france, border="grey15", add = TRUE , lwd = 0.5)
+  layoutLayer(title = paste(familles_2007$noms[i]," 2007"), 
+              author = "", sources = "", scale=NULL , col="grey40")
+  #map 2012
+  choroLayer(x = dept_pest_2012, var = familles_2012$noms2[i],
+             breaks = bks,
+             col = c(rev(carto.pal("green.pal", 4)), carto.pal("orange.pal", 4)),
+             legend.pos = "n", legend.values.rnd = 3,
+             legend.title.txt = "Qté. en µg/l" , border = NA
+  )
+  plot(france, border="grey15", add = TRUE , lwd = 0.5)
+  layoutLayer(title = paste(familles_2012$noms[i]," 2012"), 
+              author = "", sources = "", scale=NULL , col="grey40")
+  
+}
+
+dev.off()
+
+png(paste("./map/carte_dept_Moy_FamillesPesticide_2007_2012_P2.png",sep=""),  width= larg , height= haut ,res= resolution)
+opar <- par(mfrow = c(8,2), mar = c(0,0,1.2,0))
+
+i<-1
+for(i in 9:16){
+  
+  #echelle commune pour comparer 2007 à 2012
+  c_2007_2012 <- c(mesures_par_dept_2007_2[,familles_2007$noms2[i]],mesures_par_dept_2012_2[,familles_2012$noms2[i]])
+  bks <- getBreaks(v=c_2007_2012, method = "quantile", nclass = 8)
+  
+  #map 2007
+  choroLayer(x = dept_pest_2007, var = familles_2007$noms2[i],
+             breaks = bks,
+             col = c(rev(carto.pal("green.pal", 4)), carto.pal("orange.pal", 4)),
+             legend.pos = "bottomleft", legend.values.rnd = 3,
+             legend.title.txt = "Qté. en µg/l" , border = NA
+  )
+  plot(france, border="grey15", add = TRUE , lwd = 0.5)
+  layoutLayer(title = paste(familles_2007$noms[i]," 2007"), 
+              author = "", sources = "", scale=NULL , col="grey40")
+  #map 2012
+  choroLayer(x = dept_pest_2012, var = familles_2012$noms2[i],
+             breaks = bks,
+             col = c(rev(carto.pal("green.pal", 4)), carto.pal("orange.pal", 4)),
+             legend.pos = "n", legend.values.rnd = 3,
+             legend.title.txt = "Qté. en µg/l" , border = NA
+  )
+  plot(france, border="grey15", add = TRUE , lwd = 0.5)
+  layoutLayer(title = paste(familles_2012$noms[i]," 2012"), 
+              author = "", sources = "", scale=NULL , col="grey40")
+  
+}
+
+dev.off()
+
 #----preparation des données normes----
+
+
+
+
+#----preparation des données normes----
+
 
 mesures$Ecart_norme <- mesures$MA_MOY - mesures$NORME_DCE
 
